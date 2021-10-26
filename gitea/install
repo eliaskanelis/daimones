@@ -1,28 +1,7 @@
 #!/usr/bin/env bash
 
-# Script to install gitea under a user named git
-# Creates a new user named 'git'
-# Assigns a service to him to run gitea on boot
-#
-# Must be run by the main user because he will be added to the git group
-
-# -----------------------------------------------------------------------------
-# User config
-
-# TODO: user should be able to decide
-base="/mnt/hdd/gitea"
-
-# Download path
-raspberry_gitea_path="https://dl.gitea.io/gitea/1.15.5/gitea-1.15.5-linux-arm-6"
-x86_64_gitea_path="https://dl.gitea.io/gitea/1.15.5/gitea-1.15.5-linux-386"
-
-# -----------------------------------------------------------------------------
-# Get this scripts relative directory path
-
+# Variable to hold the current scripts dirname
 script_dirname="$(dirname "$0")"
-
-# -----------------------------------------------------------------------------
-# User checks
 
 # Prevent script to be run as root
 if [[ $EUID -eq 0 ]]; then
@@ -30,10 +9,70 @@ if [[ $EUID -eq 0 ]]; then
     exit 1
 fi
 
+# Function to show help information
+function show_usage()
+{
+    printf "Usage: %s [options]\n" "$0"
+    printf "\n"
+    printf "Install gitea service under a user named git.\n"
+    printf "Creates a new user named 'git' if not already available.\n"
+    printf "Assigns the user who run the script in the git group.\n"
+    printf "\n"
+    printf "Options:\n"
+    printf "  -d,--dir:  Gitea base directory (e.g: '/mnt/hdd/gitea')\n"
+    printf "  -h,--help: Print help and exit\n"
+    printf "\n"
+    return 0
+}
+
+# Argument parser
+while [ ! -z "$1" ];do
+    case "$1" in
+        -h|--help)
+	    show_usage
+	    exit 0
+	    ;;
+        -d|--dir)
+	    shift
+	    base="$1"
+	    ;;
+        *)
+	    echo "Incorrect input provided"
+	    exit 1
+    esac
+    shift
+done
+
+# Argument validations
+if [[ "${base}" == "" ]]; then
+    echo "Please select a Gitea base directory"
+    exit 1
+fi
+
+###############################################################################
+###############################################################################
+###############################################################################
+# Script starts here
+###############################################################################
+###############################################################################
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# User config
+
+# Gitea download url
+raspberry_gitea_path="https://dl.gitea.io/gitea/1.15.5/gitea-1.15.5-linux-arm-6"
+x86_64_gitea_path="https://dl.gitea.io/gitea/1.15.5/gitea-1.15.5-linux-386"
+
+# -----------------------------------------------------------------------------
+# User checks
+
+# TODO: BUG: Remove trailing slash from base
+
 # Gitea base directory shall be created before this script uses it
 if [ ! -d "${base}" ]; then
     echo "${base} is not available!"
-    echo "Please create it!"
+    echo "Please create it first!"
     exit 1
 fi
 
@@ -95,12 +134,12 @@ sudo usermod -aG git tedi
 # -----------------------------------------------------------------------------
 # Create directories
 
-sudo mkdir -p ${base}/{custom,data,log}
+sudo mkdir -p "${base}"/{custom,data,log}
 sudo mkdir -p "${base}"/custom/conf
 sudo touch "${base}"/custom/conf/app.ini
 
-sudo chown -R git:git ${base}
-sudo chmod -R 770 ${base}
+sudo chown -R git:git "${base}"
+sudo chmod -R 770 "${base}"
 sudo chmod 640 "${base}"/custom/conf/app.ini
 
 
