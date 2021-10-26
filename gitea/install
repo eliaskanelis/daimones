@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+
+# Script to install gitea under a user named git
+# Creates a new user named 'git'
+# Assigns a service to him to run gitea on boot
+#
+# Must be run by the main user because he will be added to the git group
+
+# -----------------------------------------------------------------------------
+# User config
+
+# TODO: user should be able to decide
+base="/mnt/hdd/gitea"
+
+# Download path
+raspberry_gitea_path="https://dl.gitea.io/gitea/1.15.5/gitea-1.15.5-linux-arm-6"
+x86_64_gitea_path="https://dl.gitea.io/gitea/1.15.5/gitea-1.15.5-linux-386"
+
+# -----------------------------------------------------------------------------
+# Get this scripts relative directory path
+
+script_dirname="$(dirname "$0")"
+
+# -----------------------------------------------------------------------------
+# User checks
+
+# Prevent script to be run as root
+if [[ $EUID -eq 0 ]]; then
+    echo "This script must NOT be run as root" 1>&2
+    exit 1
+fi
+
+# Gitea base directory shall be created before this script uses it
+if [ ! -d "${base}" ]; then
+    echo "${base} is not available!"
+    echo "Please create it!"
+    exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Download platform binary
+machine="$(uname -m)"
+if [[ "${machine}" == "armv7l" ]]; then
+    gitea_path="${raspberry_gitea_path}"
+elif [[ "${machine}" == "x86_64" ]]; then
+    gitea_path="${x86_64_gitea_path}"
+else
+    echo "Machine '${machine}' is not supported!"
+    exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Install gitea
+if [ ! -f /usr/local/bin/gitea ]; then
+    echo "Downloading ${gitea_path}!"
+    sudo wget -O /usr/local/bin/gitea "${gitea_path}" > /dev/null 2>&1
+    sudo chmod +x /usr/local/bin/gitea
+fi
+
+# -----------------------------------------------------------------------------
+# Install git
+command -v git > /dev/null 2>&1 ||
+    { echo >&2 "Installing git!";
+      sudo apt update
+      sudo apt install -y git
+    }
+
+# -----------------------------------------------------------------------------
+# Since we will use sqlite3 as out database we must have it in out system
+# Install sqlite3
+#command -v sqlite3 > /dev/null 2>&1 ||
+#    { echo >&2 "Installing sqlite3!";
+#      sudo apt update
+#      sudo apt install sqlite3
+#    }
+
+# -----------------------------------------------------------------------------
+# Create git user
+if ! id git &>/dev/null; then
+    echo 'Creating git user!'
+
+    sudo adduser \
+	 --system \
+	 --shell /bin/bash \
+	 --gecos 'Git Version Control' \
+	 --group \
+	 --disabled-password \
+	 --home /home/git \
+	 git
+fi
+
+# Add current user to the git group
+sudo usermod -aG git tedi
+
+# -----------------------------------------------------------------------------
+# Create directories
+
+sudo mkdir -p ${base}/{custom,data,log}
+sudo mkdir -p "${base}"/custom/conf
+sudo touch "${base}"/custom/conf/app.ini
+
+sudo chown -R git:git ${base}
+sudo chmod -R 770 ${base}
+sudo chmod 640 "${base}"/custom/conf/app.ini
+
+
+# -----------------------------------------------------------------------------
+# Create daemon (will use supervisor)
+
+# Install supervisor
+command -v supervisorctl > /dev/null 2>&1 ||
+    { echo >&2 "Installing supervisor!";
+      sudo apt update
+      sudo apt install -y supervisor
+    }
+
+# Create log for gitea
+sudo mkdir -p /var/log/gitea
+
+# Copy the supervisor config for gitea
+if [ ! -f "${script_dirname}"/supervisor.conf ]; then
+    echo "Missing important file: ${script_dirname}/supervisor.conf"
+    exit 1
+fi
+
+sudo cp "${script_dirname}"/supervisor.conf /etc/supervisor/conf.d/gitea.conf
+sudo mkdir -p /var/log/gitea
+
+# Enable the supervisor
+sudo systemctl enable supervisor
+sudo systemctl start supervisor
+
+sudo supervisorctl reread || exit 1
+sudo supervisorctl update
+sudo supervisorctl start gitea
+
+# If you have systemd enable supervisor globally
+echo "Do not forget to enable supervisor!"
+echo "e.g: on systemd"
+echo "sudo systemctl enable supervisor --now"
+
+# -----------------------------------------------------------------------------
+# Run command
+# sudo runuser -l git -c "/usr/local/bin/gitea web --work-path=${base} --custom-path=${base}/custom -c ${base}/custom/conf/app.ini"
+
+echo "Done"
