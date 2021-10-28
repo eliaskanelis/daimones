@@ -1,0 +1,112 @@
+#!/usr/bin/env bash
+
+# Variable to hold the current scripts dirname
+script_dirname="$(dirname "$0")"
+
+# Prevent script to be run as root
+if [[ $EUID -eq 0 ]]; then
+	echo "This script must NOT be run as root" 1>&2
+	exit 1
+fi
+
+# Function to show help information
+function show_usage()
+{
+	printf "Usage: %s [options]\n" "$0"
+	printf "\n"
+	printf "Setup headless mode before first boot of a raspberry pi running raspbian.\n"
+	printf "\n"
+	printf "Options:\n"
+	printf "  -s,--selection: Headless setup type (Select from 'wifi', 'eth')\n"
+	printf "                  Default is 'wifi'\n"
+	printf "  -h,--help:      Print help and exit\n"
+	printf "\n"
+	return 0
+}
+
+# Argument parser
+while [ ! -z "$1" ];do
+	case "$1" in
+	-h|--help)
+		show_usage
+		exit 0
+		;;
+	-d|--dir)
+		shift
+		selection="$1"
+		;;
+	*)
+		echo "Incorrect input provided"
+		exit 1
+	esac
+	shift
+done
+
+# Argument validations
+if [[ "${selection}" == "" ]]; then
+	selection="wifi"
+fi
+
+###############################################################################
+###############################################################################
+###############################################################################
+# Script starts here
+###############################################################################
+###############################################################################
+###############################################################################
+
+# -----------------------------------------------------------------------------
+# User config
+
+# SD card mount points for raspbian
+boot_dir="/media/${USER}/boot/"
+rootfs_dir="/media/${USER}/rootfs/"
+
+# -----------------------------------------------------------------------------
+# User checks
+
+# Check if boot is mounted
+if [ ! -d "${boot_dir}" ]; then
+	echo "'${boot_dir}' is not mounted!"
+	echo "Please mount it first!"
+	exit 1
+fi
+# Check if rootfs is mounted
+if [ ! -d "${rootfs_dir}" ]; then
+	echo "'${rootfs_dir}' is not mounted!"
+	echo "Please mount it first!"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Enable ssh at first boot
+touch "${boot_dir}"/ssh
+
+# -----------------------------------------------------------------------------
+# Make headless
+if [[ "${selection}" == "wifi" ]]; then
+	bash "${script_dirname}"/wifi/setup "${boot_dir}" "${rootfs_dir}" || exit 1
+else
+	echo "Invalid headless selection"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# First boot
+
+# Install systemd service
+sudo cp "${script_dirname}"/firstboot.service "${rootfs_dir}"/lib/systemd/system/firstboot.service || exit 1
+
+cd "${rootfs_dir}"/etc/systemd/system/multi-user.target.wants || exit 1
+sudo rm -f firstboot.service
+sudo ln -s /lib/systemd/system/firstboot.service firstboot.service
+cd - || exit 1
+
+# Install the script
+sudo cp "${script_dirname}"/firstboot.sh "${boot_dir}"/firstboot.sh || exit 1
+sudo cp -r "${script_dirname}"/firstboot "${boot_dir}"/ || exit 1
+
+sync
+
+echo "Done"
+exit 0

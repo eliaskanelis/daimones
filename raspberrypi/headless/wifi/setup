@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+# Sets wifi for headless raspberry pi in raspbian
+# It is not supposed to be used standalone
+
+# Variable to hold the current scripts dirname
+script_dirname="$(dirname "$0")"
+
+# -----------------------------------------------------------------------------
+# Arguments
+# SD card mount points for raspbian
+boot_dir="$1"
+rootfs_dir="$2"
+
+# -----------------------------------------------------------------------------
+# Argument validations
+if [[ "${boot_dir}" == "" ]]; then
+	echo "boot_dir argument missing!"
+	exit 1
+fi
+if [[ "${rootfs_dir}" == "" ]]; then
+	echo "rootfs_dir argument missing!"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Wifi setup
+
+# Ask for wifi credentials
+printf "SSID: \n"
+read -r ssid
+if [ -z "${ssid}" ]; then
+	echo "SSID can not be empty!"
+	exit 1
+fi
+printf "Wifi password for %s\n" "${ssid}"
+read -r -s password
+if [ -z "${password}" ]; then
+	echo "Wifi password can not be empty!"
+	exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Copy wpa supplicant configuration
+sed "s/<SSID>/${ssid}/g" "${script_dirname}"/wpa_supplicant.conf | \
+	sed "s/<PASS>/${password}/g" | \
+	sudo tee "${rootfs_dir}"/etc/wpa_supplicant/wpa_supplicant.conf > /dev/null
+
+sudo chmod 644 "${rootfs_dir}"/etc/wpa_supplicant/wpa_supplicant.conf
+
+# -----------------------------------------------------------------------------
+# Unblock wlan0 from rfkill
+sed -i '$ s/$/ systemd.restore_state=0 rfkill.default_state=1/' "${boot_dir}"/cmdline.txt
+
+# -----------------------------------------------------------------------------
+# Copy network interfaces
+sudo cp "${script_dirname}"/interfaces "${rootfs_dir}"/etc/network/interfaces || exit 1
+sudo chmod 644 "${rootfs_dir}"/etc/network/interfaces
