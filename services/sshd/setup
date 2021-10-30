@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+
+# Variable to hold the current scripts dirname
+script_dirname="$(dirname "$0")"
+
+# Prevent script to be run as root
+if [[ $EUID -eq 0 ]]; then
+	echo "This script must NOT be run as root" 1>&2
+	exit 1
+fi
+
+# Function to show help information
+function show_usage()
+{
+	printf "Usage: %s [options]\n" "$0"
+	printf "\n"
+	printf "Make an sshd config more secure.\n"
+	printf "\n"
+	printf "Options:\n"
+	printf "  -b,--banner:    Custom banner text\n"
+	printf "  -p,--port:      SSH Server default port (default: 22)\n"
+	printf "  -h,--help:      Print help and exit\n"
+	printf "\n"
+	return 0
+}
+
+# Argument parser
+while [ ! -z "$1" ];do
+	case "$1" in
+	-h|--help)
+		show_usage
+		exit 0
+		;;
+	-b|--banner)
+		shift
+		banner_text="$1"
+		;;
+	-p|--port)
+		shift
+		ssh_port_number="$1"
+		;;
+	*)
+		echo "Incorrect input provided"
+		exit 1
+	esac
+	shift
+done
+
+# Argument validations
+if [[ "${banner_text}" == "" ]]; then
+	banner_text="\
+---------------------------------------------------------
+                 Welcome to $(hostname)
+
+       All connections are monitored and recorded
+Disconnect IMMEDIATELY if you are not an authorized user!
+---------------------------------------------------------
+"
+fi
+
+# Argument validations
+if [[ "${ssh_port_number}" == "" ]]; then
+	ssh_port_number="22"
+fi
+
+###############################################################################
+###############################################################################
+###############################################################################
+# Script starts here
+###############################################################################
+###############################################################################
+###############################################################################
+
+sshd_config_filepath="/etc/ssh/sshd_config"
+sshd_banner_filepath="/etc/ssh/banner"
+pam_script_name="ssh_alert.sh"
+pam_script_dirpath="/etc/pam.scripts"
+
+# -----------------------------------------------------------------------------
+# Install msg
+# TODO: install msg at /usr/local/bin/msg
+
+# -----------------------------------------------------------------------------
+# Install opensshserver
+command -v sshd > /dev/null 2>&1 ||
+	{
+		echo "Installing openssh-server!";
+		sudo apt update
+		sudo apt install -y openssh-server
+	}
+
+command -v sshd > /dev/null 2>&1 ||
+	{
+		echo openssh-server is not installed!
+		exit 1
+	}
+
+# -----------------------------------------------------------------------------
+# Server configs
+declare -A sshd_config
+sshd_config["Port"]="${ssh_port_number}"
+sshd_config["LoginGraceTime"]="30"
+sshd_config["PermitRootLogin"]="no"
+sshd_config["StrictModes"]="yes"
+sshd_config["MaxAuthTries"]="3"
+sshd_config["PubkeyAuthentication"]="yes"
+sshd_config["AuthorizedKeysFile"]=".ssh/authorized_keys"
+sshd_config["IgnoreRhosts"]="yes"
+sshd_config["PasswordAuthentication"]="no"
+sshd_config["PermitEmptyPasswords"]="no"
+sshd_config["ChallengeResponseAuthentication"]="no"
+sshd_config["AllowTcpForwarding"]="no"
+sshd_config["GatewayPorts"]="no"
+sshd_config["X11Forwarding"]="no"
+sshd_config["PermitTunnel"]="no"
+sshd_config["UsePAM"]="yes"
+sshd_config["Banner"]="${sshd_banner_filepath}"
+sshd_config["MaxSessions"]="1"
+
+for key in "${!sshd_config[@]}"; do
+	# Replace / with \/ because sed wouldnot work
+	value="${sshd_config[${key}]//[\/]/\\/}"
+	sudo sed -i "s/^#\?\ *\?\(${key}[[:space:]]\).*$/\1${value}/" "${sshd_config_filepath}" || exit 1
+done
+
+# AllowUsers
+if grep -q "AllowUsers" "${sshd_config_filepath}"; then
+	sudo sed -i "/^#[[:space:]].*/! s/.*AllowUsers.*/AllowUsers ${USER}/" "${sshd_config_filepath}" || exit 1
+else
+	echo "" | sudo tee -a "${sshd_config_filepath}" 1> /dev/null || exit 1
+	echo "AllowUsers ${USER}" 2> /dev/null | sudo tee -a "${sshd_config_filepath}" 1> /dev/null || exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Change /etc/ssh/banner
+echo "${banner_text}" | sudo tee ${sshd_banner_filepath} > /dev/null || exit 1
+
+# -----------------------------------------------------------------------------
+# Setup pam
+
+pam_script_filepath="${pam_script_dirpath}/${pam_script_name}"
+
+# Create the directory for pam scripts
+sudo mkdir -p "${pam_script_dirpath}"
+sudo chmod 0755 "${pam_script_dirpath}"
+sudo chown root:root "${pam_script_dirpath}"
+
+# Create the pam script
+sudo cp "${script_dirname}/${pam_script_name}" "${pam_script_filepath}" || exit 1
+sudo chmod 0700 "${pam_script_filepath}"
+sudo chown root:root "${pam_script_filepath}"
+
+# Install the pam script
+pam_command="session required pam_exec.so ${pam_script_filepath}"
+if [ -z "$(grep "${pam_script_filepath}" /etc/pam.d/sshd)" ]; then
+	# Append since it was not found
+	echo -e "\n# Message me" | sudo tee -a /etc/pam.d/sshd > /dev/null || exit 1
+	echo "auth    required pam_env.so  envfile=/home/${USER}/.secret" | sudo tee -a /etc/pam.d/sshd > /dev/null || exit 1
+	echo "${pam_command}" | sudo tee -a /etc/pam.d/sshd > /dev/null || exit 1
+fi
+
+# -----------------------------------------------------------------------------
+# Restart sshd
+sudo service ssh restart
+
+# -----------------------------------------------------------------------------
+# Firewall
+echo "Do not forget to setup the firewall"
+
+exit 0

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+# Sents a message via slack.
+# Given the slack webtoken
+
+# This is the slack webhook
+webhook="${SLACK_WEBHOOK}"
+
+if [[ -z "${webhook}" ]]; then
+	echo "Could not find env variable for webhook"
+	exit 1
+fi
+
+# Check if there are arguments
+if (( "$#" == 0 )) ; then
+	# Check if stdin is not empty
+	if [ ! -t 0 ]; then
+		# Read from stdin
+		message=$(cat /dev/stdin)
+	fi
+else
+	# Read all arguments
+	message="$*"
+fi
+
+if [[ -z "${message}" ]]; then
+	message="Tried to sent an empty message.!"
+fi
+
+# Constract Message
+user="$(whoami)"
+host="$(hostname)"
+text="${user}@${host}\n"
+text+="${message}"
+
+# Sent the message
+curl -X POST -H 'Content-type: application/json' --data "{\"text\":\"${text}\"}" "${webhook}" &> /dev/null || exit 1

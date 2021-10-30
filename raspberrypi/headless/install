@@ -31,7 +31,7 @@ while [ ! -z "$1" ];do
 		show_usage
 		exit 0
 		;;
-	-d|--dir)
+	-s|--selection)
 		shift
 		selection="$1"
 		;;
@@ -65,6 +65,10 @@ rootfs_dir="/media/${USER}/rootfs/"
 # -----------------------------------------------------------------------------
 # User checks
 
+# TODO: Try to mount automatically
+# mount "${boot_dir}" || exit 1
+# mount "${rootfs_dir}" || exit 1
+
 # Check if boot is mounted
 if [ ! -d "${boot_dir}" ]; then
 	echo "'${boot_dir}' is not mounted!"
@@ -85,7 +89,7 @@ touch "${boot_dir}"/ssh
 # -----------------------------------------------------------------------------
 # Make headless
 if [[ "${selection}" == "wifi" ]]; then
-	bash "${script_dirname}"/wifi/setup "${boot_dir}" "${rootfs_dir}" || exit 1
+	bash "${script_dirname}"/network/setup "${boot_dir}" "${rootfs_dir}" || exit 1
 else
 	echo "Invalid headless selection"
 	exit 1
@@ -97,16 +101,33 @@ fi
 # Install systemd service
 sudo cp "${script_dirname}"/firstboot.service "${rootfs_dir}"/lib/systemd/system/firstboot.service || exit 1
 
+# -----------------------------------------------------------------------------
+# Set Skel
+sudo rm -rf "${rootfs_dir}"/etc/skel/
+sudo cp -r "${script_dirname}"/skel "${rootfs_dir}"/etc/ || exit 1
+
+# -----------------------------------------------------------------------------
+# Copy services and utils
+sudo mkdir -p "${boot_dir}"/scripts/
+sudo cp -r "${script_dirname}"/../../utils    "${boot_dir}"/scripts/ || exit 1
+sudo cp -r "${script_dirname}"/../../services "${boot_dir}"/scripts/ || exit 1
+
+# -----------------------------------------------------------------------------
+# Install the firstboot service
 cd "${rootfs_dir}"/etc/systemd/system/multi-user.target.wants || exit 1
 sudo rm -f firstboot.service
 sudo ln -s /lib/systemd/system/firstboot.service firstboot.service
 cd - || exit 1
 
-# Install the script
+# Install the firstboot script
 sudo cp "${script_dirname}"/firstboot.sh "${boot_dir}"/firstboot.sh || exit 1
 sudo cp -r "${script_dirname}"/firstboot "${boot_dir}"/ || exit 1
 
+# -----------------------------------------------------------------------------
+# Unmount
 sync
+umount "${boot_dir}"
+umount "${rootfs_dir}"
 
 echo "Done"
 exit 0
