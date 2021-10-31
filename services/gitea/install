@@ -156,6 +156,7 @@ fi
 
 # Add the gitea supervisor config
 sudo cp "${script_dirname}"/supervisor.conf /etc/supervisor/conf.d/gitea.conf
+sudo sed -i "s#<BASE_DIR>#${base}#g" /etc/supervisor/conf.d/gitea.conf
 
 # Create log for gitea
 sudo mkdir -p /var/log/gitea
@@ -168,5 +169,9 @@ sudo supervisorctl reread || exit 1
 sudo supervisorctl update
 sudo supervisorctl start gitea
 
-
-echo "Done"
+# Further steps
+echo -e "\n--------------------------------"
+echo "Do not forget:"
+echo "- sshd: Enable PAM"
+echo "- sshd: AllowUsers git"
+echo "- Enable the firewall"
