@@ -10,7 +10,7 @@ SSH login was successful, so here are some information for security:
   Server:       $(uname -a)
 "
 
-if [ ${PAM_TYPE} = "open_session" ]; then
+if [ "${PAM_TYPE}" = "open_session" ]; then
 	/usr/local/bin/msg "${text}"
 fi
 
