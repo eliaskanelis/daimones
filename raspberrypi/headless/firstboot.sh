@@ -20,20 +20,26 @@ systemctl restart avahi-daemon
 
 # Ask for new username
 username="tedi"
+usermod -a -G adm,dialout,cdrom,sudo,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi "${username}"
+# passwd -d "${username}"
+
+# Fetch skel
+rsync -avr /etc/skel/ /home/"${username}"
+chown -R "${username}":"${username}" /home/"${username}"
 
 # Remove pi user
-if id pi &>/dev/null; then
-	pkill -u pi
-	passwd --lock pi
-	deluser --remove-home pi
-fi
+#if id pi &>/dev/null; then
+#	pkill -u pi
+#	passwd --lock pi
+#	deluser --remove-home pi
+#fi
 
 # Add new user
-if ! id "${username}" &>/dev/null; then
-	adduser --disabled-password --gecos=",,,," "${username}"
-	passwd -d "${username}"
-	usermod -a -G adm,dialout,cdrom,sudo,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi "${username}"
-fi
+#if ! id "${username}" &>/dev/null; then
+#	adduser --disabled-password --gecos=",,,," "${username}"
+#	passwd -d "${username}"
+#	usermod -a -G adm,dialout,cdrom,sudo,audio,video,plugdev,games,users,input,netdev,gpio,i2c,spi "${username}"
+#fi
 
 # -----------------------------------------------------------------------------
 # Security

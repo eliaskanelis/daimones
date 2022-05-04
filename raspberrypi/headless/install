@@ -96,6 +96,10 @@ else
 fi
 
 # -----------------------------------------------------------------------------
+# Headless user config
+sudo cp "${script_dirname}"/userconf "${boot_dir}"/userconf || exit 1
+
+# -----------------------------------------------------------------------------
 # First boot
 
 # Install systemd service
