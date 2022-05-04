@@ -83,10 +83,6 @@ if [ ! -d "${rootfs_dir}" ]; then
 fi
 
 # -----------------------------------------------------------------------------
-# Enable ssh at first boot
-touch "${boot_dir}"/ssh
-
-# -----------------------------------------------------------------------------
 # Make headless
 if [[ "${selection}" == "wifi" ]]; then
 	bash "${script_dirname}"/network/setup "${boot_dir}" "${rootfs_dir}" || exit 1
@@ -94,6 +90,10 @@ else
 	echo "Invalid headless selection"
 	exit 1
 fi
+
+# -----------------------------------------------------------------------------
+# Enable ssh at first boot
+touch "${boot_dir}"/ssh
 
 # -----------------------------------------------------------------------------
 # Headless user config
