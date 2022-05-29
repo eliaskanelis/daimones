@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+#
+# Instructions from:
+# https://docs.docker.com/engine/install/debian/
+#
+
+sudo apt-get update
+
+sudo apt-get install -y \
+    ca-certificates     \
+    curl                \
+    gnupg               \
+    lsb-release
+
+# Add docker's official key
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Setup a stable repository
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/debian \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install docker
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# Add current user to the docker group
+sudo usermod -a -G docker ${USER}
+
+#
+# In raspberrypi do this
+#
+# It was a DNS error for me. By setting /etc/docker/daemon.json with,
+#
+#{
+#  "dns": ["8.8.8.8"]
+#}
+
+#and
+
+# sudo service docker restart
