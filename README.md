@@ -32,7 +32,7 @@ writeSDcard <image.img>
 6. Verify that firewall is enabled.
 
 ```sh
-/boot/scripts/services/sshd/setup
+sudo ufw status
 ```
 
 7. Optional: Set the external drive
