@@ -111,6 +111,10 @@ sudo rm -rf "${rootfs_dir}"/etc/skel/
 sudo cp -r "${script_dirname}"/skel "${rootfs_dir}"/etc/ || exit 1
 
 # -----------------------------------------------------------------------------
+# Set udev rules
+cp -r "${script_dirname}"/udev/69-hdparm.rules "${rootfs_dir}"/etc/udev/rules.d/ || exit 1
+
+# -----------------------------------------------------------------------------
 # Copy services and utils
 sudo mkdir -p "${boot_dir}"/scripts/
 sudo cp -r "${script_dirname}"/../../utils    "${boot_dir}"/scripts/ || exit 1

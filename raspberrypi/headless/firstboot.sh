@@ -64,7 +64,7 @@ chmod 600 /home/"${username}"/.ssh/authorized_keys
 apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false
 
 # Install packages
-apt-get install -y ufw
+apt-get install -y ufw hdparm
 
 # -----------------------------------------------------------------------------
 # Firewall

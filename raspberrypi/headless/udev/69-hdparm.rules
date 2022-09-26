@@ -1,0 +1,2 @@
+# Apply power-saving settings to all rotational drives (hard disk with rotational head, excluding in particular solid state drives)
+ACTION=="add|change", KERNEL=="sd[a-z]", ATTRS{queue/rotational}=="1", RUN+="/usr/sbin/hdparm -B 127 /dev/%k"
